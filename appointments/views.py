@@ -6,6 +6,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
 from .models import Slot, ConsultationScheduleConfig, RegistrationSetting
 from .utils import get_slots_for_day
+from django.http import JsonResponse
 
 def schedule(request):
     now = timezone.now()  # UTC
@@ -85,3 +86,116 @@ def unbook_slot(request, slot_id):
         slot.booked_by = None
         slot.save()
     return redirect('appointments:schedule')
+
+
+def book_nearest(request, consultation_date):
+    """
+    Находит ближайший свободный слот для указанной даты (YYYY-MM-DD) и записывает пользователя,
+    если для этой даты еще нет записи с таким full_name.
+    Ожидает POST-параметр full_name.
+    """
+    if request.method != "POST":
+        return JsonResponse({"success": False, "error": "Only POST allowed"}, status=405)
+
+    full_name = request.POST.get("full_name", "").strip()
+    if not full_name:
+        return JsonResponse({"success": False, "error": "No full_name provided"}, status=400)
+
+    try:
+        cons_date = datetime.datetime.strptime(consultation_date, "%Y-%m-%d").date()
+    except ValueError:
+        return JsonResponse({"success": False, "error": "Invalid date format"}, status=400)
+
+    moscow_tz = pytz.timezone("Europe/Moscow")
+    # Определяем границы дня в мск
+    start_local = datetime.datetime.combine(cons_date, datetime.time.min)
+    end_local = datetime.datetime.combine(cons_date, datetime.time.max)
+    start_localized = moscow_tz.localize(start_local)
+    end_localized = moscow_tz.localize(end_local)
+    # Переводим границы в UTC
+    start_utc = start_localized.astimezone(pytz.utc)
+    end_utc = end_localized.astimezone(pytz.utc)
+
+    # Проверяем, есть ли уже запись для этого full_name на заданную дату (без учета регистра)
+    if Slot.objects.filter(
+            start_time__gte=start_utc,
+            start_time__lte=end_utc,
+            booked_by__iexact=full_name
+    ).exists():
+        return JsonResponse({
+            "success": False,
+            "error": "Вы уже записаны на консультацию в этот день"
+        }, status=400)
+
+    now = timezone.now()
+    # Если дата консультации — сегодня (в мск), отфильтруем слоты, которые уже начались
+    if cons_date == now.astimezone(moscow_tz).date():
+        free_slots = Slot.objects.filter(
+            start_time__gte=start_utc,
+            start_time__lte=end_utc,
+            booked_by__isnull=True,
+            start_time__gt=now
+        )
+    else:
+        free_slots = Slot.objects.filter(
+            start_time__gte=start_utc,
+            start_time__lte=end_utc,
+            booked_by__isnull=True
+        )
+
+    free_slot = free_slots.order_by('start_time').first()
+    if free_slot:
+        free_slot.booked_by = full_name
+        free_slot.save()
+        return JsonResponse({"success": True, "slot_id": free_slot.id})
+    else:
+        return JsonResponse({
+            "success": False,
+            "error": "Нет свободного слота в этот день"
+        }, status=404)
+
+def book_nearest_input(request, consultation_date):
+    """
+    Если у пользователя нет ФИО в localStorage, эта страница запрашивает ввод ФИО.
+    При POST-запросе, если введено ФИО, происходит попытка записи на ближайший свободный слот для указанной даты.
+    """
+    try:
+        cons_date = datetime.datetime.strptime(consultation_date, "%Y-%m-%d").date()
+    except ValueError:
+        return HttpResponse("Неверный формат даты", status=400)
+
+    error = None
+
+    if request.method == "POST":
+        full_name = request.POST.get("full_name", "").strip()
+        if not full_name:
+            error = "Пожалуйста, введите ФИО."
+        else:
+            moscow_tz = pytz.timezone("Europe/Moscow")
+            start_local = datetime.datetime.combine(cons_date, datetime.time.min)
+            end_local = datetime.datetime.combine(cons_date, datetime.time.max)
+            start_localized = moscow_tz.localize(start_local)
+            end_localized = moscow_tz.localize(end_local)
+            start_utc = start_localized.astimezone(pytz.utc)
+            end_utc = end_localized.astimezone(pytz.utc)
+            now = timezone.now()
+            if cons_date == now.astimezone(moscow_tz).date():
+                free_slots = Slot.objects.filter(start_time__gte=start_utc, start_time__lte=end_utc, booked_by__isnull=True, start_time__gt=now)
+            else:
+                free_slots = Slot.objects.filter(start_time__gte=start_utc, start_time__lte=end_utc, booked_by__isnull=True)
+            # Проверяем, если пользователь уже записан на этот день
+            if Slot.objects.filter(start_time__gte=start_utc, start_time__lte=end_utc, booked_by__iexact=full_name).exists():
+                error = "Вы уже записаны на консультацию в этот день."
+            else:
+                free_slot = free_slots.order_by('start_time').first()
+                if free_slot:
+                    free_slot.booked_by = full_name
+                    free_slot.save()
+                    # После успешной записи перенаправляем на страницу расписания
+                    return redirect("appointments:schedule")
+                else:
+                    error = "Нет свободного слота в этот день."
+    return render(request, "appointments/book_nearest_input.html", {
+        "consultation_date": consultation_date,
+        "error": error
+    })

@@ -4,22 +4,36 @@
 <head>
   <meta charset="UTF-8">
   <title>Запись на слот</title>
+  <!-- Мета-тег для адаптивного отображения -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <!-- Подключение Bootstrap -->
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
 </head>
 <body>
 <div class="container mt-4">
-  <h1>Запись на слот</h1>
-  <p><strong>Слот:</strong> {{ slot.start_time|date:"d.m.Y H:i" }} - {{ slot.end_time|date:"H:i" }}</p>
-  <form method="post" id="booking-form">
-    {% csrf_token %}
-    <div class="form-group" id="fio-group">
-      <label for="full_name" id="fio-label">Ваше ФИО</label>
-      <input type="text" class="form-control" id="full_name" name="full_name" placeholder="Введите ФИО" required>
+  <div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+      <div class="card shadow-sm">
+        <div class="card-header">
+          <h1 class="h4 mb-0">Запись на слот</h1>
+        </div>
+        <div class="card-body">
+          <p><strong>Слот:</strong> {{ slot.start_time|date:"d.m.Y H:i" }} - {{ slot.end_time|date:"H:i" }}</p>
+          <form method="post" id="booking-form">
+            {% csrf_token %}
+            <div class="form-group" id="fio-group">
+              <label for="full_name" id="fio-label">Ваше ФИО</label>
+              <input type="text" class="form-control" id="full_name" name="full_name" placeholder="Введите ФИО" required>
+            </div>
+            <button type="submit" class="btn btn-success btn-block">Записаться</button>
+          </form>
+        </div>
+      </div>
     </div>
-    <button type="submit" class="btn btn-success">Записаться</button>
-  </form>
+  </div>
 </div>
 <script>
+  // Сохранение ФИО в localStorage при отправке формы
   document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('booking-form').addEventListener('submit', function() {
       var fioInput = document.getElementById('full_name');

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Запись на ближайшее свободное</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+</head>
+<body>
+<div class="container mt-4">
+  <h1 class="text-center">Запись на ближайшее свободное</h1>
+  <p class="text-center">Дата консультации: {{ consultation_date }}</p>
+  {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+  {% endif %}
+  <form method="post">
+    {% csrf_token %}
+    <div class="form-group">
+      <label for="full_name">Введите ваше ФИО</label>
+      <input type="text" class="form-control" id="full_name" name="full_name" placeholder="Ваше ФИО" required>
+    </div>
+    <button type="submit" class="btn btn-success btn-block">Записаться</button>
+  </form>
+</div>
+<script>
+  // После успешного ввода ФИО и отправки формы, сохраняем ФИО в localStorage
+  document.querySelector('form').addEventListener('submit', function() {
+    var fio = document.getElementById('full_name').value;
+    if(fio && fio.trim() !== "") {
+      localStorage.setItem('fio', fio.trim());
+    }
+  });
+</script>
+</body>
+</html>
