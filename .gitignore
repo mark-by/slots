@@ -36,7 +36,6 @@ db.sqlite3
 *.sql
 
 # Static and media files (если генерируются автоматически, их можно игнорировать)
-staticfiles/
 media/
 
 # Unit test / coverage reports
