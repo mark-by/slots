@@ -6,7 +6,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
 from .models import Slot, ConsultationScheduleConfig, RegistrationSetting
 from .utils import get_slots_for_day
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 
 def schedule(request):
     now = timezone.now()  # UTC
