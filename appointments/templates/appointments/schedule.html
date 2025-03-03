@@ -1,0 +1,217 @@
+<!-- appointments/templates/appointments/schedule.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Расписание консультаций</title>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+</head>
+<body>
+<div class="container mt-4">
+  <h1>Расписание консультаций</h1>
+
+  {% if registration_open_for_next_week %}
+    <h2>Консультации следующей недели</h2>
+    {% for day, slots in next_week_consultations.items %}
+      <h3>{{ day|date:"d.m.Y (l)" }}</h3>
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>№</th>
+            <th>Время</th>
+            <th>Статус</th>
+            <th>Действие</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for slot in slots %}
+          <tr>
+            <td>{{ forloop.counter }}</td>
+            <td>{{ slot.start_time|date:"H:i" }} - {{ slot.end_time|date:"H:i" }}</td>
+            <td>
+              {% if slot.booked_by %}
+                Занят: {{ slot.booked_by }}
+              {% else %}
+                Свободен
+              {% endif %}
+            </td>
+            <td>
+              {% if not slot.booked_by %}
+                <button type="button" class="btn btn-primary btn-sm book-slot" data-slot-id="{{ slot.id }}">
+                  Записаться
+                </button>
+              {% else %}
+                <button type="button" class="btn btn-warning btn-sm unbook-slot" data-slot-id="{{ slot.id }}">
+                  Открепить
+                </button>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endfor %}
+  {% else %}
+    <div class="alert alert-info">
+      Запись на следующую неделю откроется: {{ registration_open_datetime|date:"d.m.Y H:i" }}
+    </div>
+  {% endif %}
+
+  <h2>Консультации текущей недели</h2>
+  {% if current_consultations %}
+    {% for day, slots in current_consultations.items %}
+      <h3>{{ day|date:"d.m.Y (l)" }}</h3>
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>№</th>
+            <th>Время</th>
+            <th>Статус</th>
+            <th>Действие</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for slot in slots %}
+          <tr>
+            <td>{{ forloop.counter }}</td>
+            <td>{{ slot.start_time|date:"H:i" }} - {{ slot.end_time|date:"H:i" }}</td>
+            <td>
+              {% if slot.booked_by %}
+                Занят: {{ slot.booked_by }}
+              {% else %}
+                Свободен
+              {% endif %}
+            </td>
+            <td>
+              {% if not slot.booked_by %}
+                <button type="button" class="btn btn-primary btn-sm book-slot" data-slot-id="{{ slot.id }}">
+                  Записаться
+                </button>
+              {% else %}
+                <button type="button" class="btn btn-warning btn-sm unbook-slot" data-slot-id="{{ slot.id }}">
+                  Открепить
+                </button>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endfor %}
+  {% else %}
+    <p>Нет консультаций в оставшиеся дни текущей недели.</p>
+  {% endif %}
+
+  <h2>Прошедшие консультации</h2>
+  {% if past_consultations %}
+    {% for day, slots in past_consultations.items %}
+      <h3>{{ day|date:"d.m.Y (l)" }}</h3>
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>№</th>
+            <th>Время</th>
+            <th>Статус</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for slot in slots %}
+          <tr>
+            <td>{{ forloop.counter }}</td>
+            <td>{{ slot.start_time|date:"H:i" }} - {{ slot.end_time|date:"H:i" }}</td>
+            <td>
+              {% if slot.booked_by %}
+                Занят: {{ slot.booked_by }}
+              {% else %}
+                Не записан
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endfor %}
+  {% else %}
+    <p>Нет прошедших консультаций.</p>
+  {% endif %}
+</div>
+
+<script>
+  // Функция для получения CSRF-токена из cookie
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+
+  // При клике на кнопку "Записаться"
+  document.querySelectorAll('.book-slot').forEach(button => {
+    button.addEventListener('click', function() {
+      const slotId = this.getAttribute('data-slot-id');
+      const storedFio = localStorage.getItem('fio');
+      if (storedFio && storedFio.trim() !== "") {
+        // Если ФИО уже сохранено, выполняем AJAX-запрос
+        fetch('/book/' + slotId + '/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': getCookie('csrftoken')
+          },
+          body: 'full_name=' + encodeURIComponent(storedFio)
+        })
+        .then(response => {
+          if (response.ok) {
+            // Обновляем страницу, чтобы отобразить, что слот теперь занят
+            location.reload();
+          } else {
+            alert('Ошибка записи.');
+          }
+        })
+        .catch(error => {
+          console.error(error);
+          alert('Ошибка записи.');
+        });
+      } else {
+        // Если ФИО нет в localStorage, перенаправляем на страницу ввода
+        window.location.href = '/book/' + slotId + '/';
+      }
+    });
+  });
+
+  // При клике на кнопку "Открепить"
+  document.querySelectorAll('.unbook-slot').forEach(button => {
+    button.addEventListener('click', function() {
+      const slotId = this.getAttribute('data-slot-id');
+      fetch('/unbook/' + slotId + '/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-CSRFToken': getCookie('csrftoken')
+        }
+      })
+      .then(response => {
+        if (response.ok) {
+          // Обновляем страницу, чтобы отобразить, что слот стал свободен
+          location.reload();
+        } else {
+          alert('Ошибка открепления.');
+        }
+      })
+      .catch(error => {
+        console.error(error);
+        alert('Ошибка открепления.');
+      });
+    });
+  });
+</script>
+</body>
+</html>
